@@ -61,102 +61,118 @@ func (d *selectData) ToSql() (sqlStr string, args []interface{}, err error) {
 	return
 }
 
+func (d *selectData) Tail() (sqlTailStr string, args []interface{}, err error) {
+	sqlTailStr, args, err = d.toSqlRawTail(true)
+	if err != nil {
+		return
+	}
+
+	sqlTailStr, err = d.PlaceholderFormat.ReplacePlaceholders(sqlTailStr)
+	return
+}
+
 func (d *selectData) toSqlRaw() (sqlStr string, args []interface{}, err error) {
+	return d.toSqlRawTail(false)
+}
+
+func (d *selectData) toSqlRawTail(onlyTail bool) (sqlStr string, args []interface{}, err error) {
 	if len(d.Columns) == 0 {
 		err = fmt.Errorf("select statements must have at least one result column")
 		return
 	}
 
-	sql := &bytes.Buffer{}
+	s := &bytes.Buffer{}
 
-	if len(d.Prefixes) > 0 {
-		args, err = appendToSql(d.Prefixes, sql, " ", args)
-		if err != nil {
-			return
+	if !onlyTail {
+		if len(d.Prefixes) > 0 {
+			args, err = appendToSql(d.Prefixes, s, " ", args)
+			if err != nil {
+				return
+			}
+
+			s.WriteString(" ")
 		}
 
-		sql.WriteString(" ")
-	}
+		s.WriteString("SELECT ")
 
-	sql.WriteString("SELECT ")
-
-	if len(d.Options) > 0 {
-		sql.WriteString(strings.Join(d.Options, " "))
-		sql.WriteString(" ")
-	}
-
-	if len(d.Columns) > 0 {
-		args, err = appendToSql(d.Columns, sql, ", ", args)
-		if err != nil {
-			return
+		if len(d.Options) > 0 {
+			s.WriteString(strings.Join(d.Options, " "))
+			s.WriteString(" ")
 		}
-	}
 
-	if d.From != nil {
-		sql.WriteString(" FROM ")
-		args, err = appendToSql([]Sqlizer{d.From}, sql, "", args)
-		if err != nil {
-			return
+		if len(d.Columns) > 0 {
+			args, err = appendToSql(d.Columns, s, ", ", args)
+			if err != nil {
+				return
+			}
 		}
-	}
 
-	if len(d.Joins) > 0 {
-		sql.WriteString(" ")
-		args, err = appendToSql(d.Joins, sql, " ", args)
-		if err != nil {
-			return
+		if d.From != nil {
+			s.WriteString(" FROM ")
+			args, err = appendToSql([]Sqlizer{d.From}, s, "", args)
+			if err != nil {
+				return
+			}
+		}
+
+		if len(d.Joins) > 0 {
+			s.WriteString(" ")
+			args, err = appendToSql(d.Joins, s, " ", args)
+			if err != nil {
+				return
+			}
 		}
 	}
 
 	if len(d.WhereParts) > 0 {
-		sql.WriteString(" WHERE ")
-		args, err = appendToSql(d.WhereParts, sql, " AND ", args)
+		s.WriteString(" WHERE ")
+		args, err = appendToSql(d.WhereParts, s, " AND ", args)
 		if err != nil {
 			return
 		}
 	}
 
 	if len(d.GroupBys) > 0 {
-		sql.WriteString(" GROUP BY ")
-		sql.WriteString(strings.Join(d.GroupBys, ", "))
+		s.WriteString(" GROUP BY ")
+		s.WriteString(strings.Join(d.GroupBys, ", "))
 	}
 
 	if len(d.HavingParts) > 0 {
-		sql.WriteString(" HAVING ")
-		args, err = appendToSql(d.HavingParts, sql, " AND ", args)
+		s.WriteString(" HAVING ")
+		args, err = appendToSql(d.HavingParts, s, " AND ", args)
 		if err != nil {
 			return
 		}
 	}
 
 	if len(d.OrderByParts) > 0 {
-		sql.WriteString(" ORDER BY ")
-		args, err = appendToSql(d.OrderByParts, sql, ", ", args)
+		s.WriteString(" ORDER BY ")
+		args, err = appendToSql(d.OrderByParts, s, ", ", args)
 		if err != nil {
 			return
 		}
 	}
 
 	if len(d.Limit) > 0 {
-		sql.WriteString(" LIMIT ")
-		sql.WriteString(d.Limit)
+		s.WriteString(" LIMIT ")
+		s.WriteString(d.Limit)
 	}
 
 	if len(d.Offset) > 0 {
-		sql.WriteString(" OFFSET ")
-		sql.WriteString(d.Offset)
+		s.WriteString(" OFFSET ")
+		s.WriteString(d.Offset)
 	}
 
 	if len(d.Suffixes) > 0 {
-		sql.WriteString(" ")
+		s.WriteString(" ")
 
-		args, err = appendToSql(d.Suffixes, sql, " ", args)
+		args, err = appendToSql(d.Suffixes, s, " ", args)
 		if err != nil {
 			return
 		}
 	}
 
-	sqlStr = sql.String()
+	sqlStr = s.String()
 	return
 }
 
@@ -223,6 +239,12 @@ func (b SelectBuilder) toSqlRaw() (string, []interface{}, error) {
 	return data.toSqlRaw()
 }
 
+// Tail builds the tail part of the query (WHERE and following) into an SQL string and bound args.
+func (b SelectBuilder) Tail() (string, []interface{}, error) {
+	data := builder.GetStruct(b).(selectData)
+	return data.Tail()
+}
+
 // MustSql builds the query into a SQL string and bound args.
 // It panics if there are any errors.
 func (b SelectBuilder) MustSql() (string, []interface{}) {
@@ -272,7 +294,8 @@ func (b SelectBuilder) RemoveColumns() SelectBuilder {
 // Column adds a result column to the query.
 // Unlike Columns, Column accepts args which will be bound to placeholders in
 // the columns string, for example:
-//   Column("IF(col IN ("+squirrel.Placeholders(3)+"), 1, 0) as col", 1, 2, 3)
+//
+//	Column("IF(col IN ("+squirrel.Placeholders(3)+"), 1, 0) as col", 1, 2, 3)
 func (b SelectBuilder) Column(column interface{}, args ...interface{}) SelectBuilder {
 	return builder.Append(b, "Columns", newPart(column, args...)).(SelectBuilder)
 }

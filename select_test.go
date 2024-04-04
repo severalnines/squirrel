@@ -461,3 +461,45 @@ func TestRemoveColumns(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "SELECT name FROM users", sql)
 }
+
+func TestSelectBuilderTail(t *testing.T) {
+	subQ := Select("aa", "bb").From("dd")
+	b := Select("a", "b").
+		Prefix("WITH prefix AS ?", 0).
+		Distinct().
+		Columns("c").
+		Column("IF(d IN ("+Placeholders(3)+"), 1, 0) as stat_column", 1, 2, 3).
+		Column(Expr("a > ?", 100)).
+		Column(Alias(Eq{"b": []int{101, 102, 103}}, "b_alias")).
+		Column(Alias(subQ, "subq")).
+		From("e").
+		JoinClause("CROSS JOIN j1").
+		Join("j2").
+		LeftJoin("j3").
+		RightJoin("j4").
+		InnerJoin("j5").
+		CrossJoin("j6").
+		Where("f = ?", 4).
+		Where(Eq{"g": 5}).
+		Where(map[string]interface{}{"h": 6}).
+		Where(Eq{"i": []int{7, 8, 9}}).
+		Where(Or{Expr("j = ?", 10), And{Eq{"k": 11}, Expr("true")}}).
+		GroupBy("l").
+		Having("m = n").
+		OrderByClause("? DESC", 1).
+		OrderBy("o ASC", "p DESC").
+		Limit(12).
+		Offset(13).
+		Suffix("FETCH FIRST ? ROWS ONLY", 14)
+
+	sql, args, err := b.Tail()
+	assert.NoError(t, err)
+
+	expectedSql :=
+		" WHERE f = ? AND g = ? AND h = ? AND i IN (?,?,?) AND (j = ? OR (k = ? AND true)) GROUP BY l " +
+			"HAVING m = n ORDER BY ? DESC, o ASC, p DESC LIMIT 12 OFFSET 13 FETCH FIRST ? ROWS ONLY"
+	assert.Equal(t, expectedSql, sql)
+
+	expectedArgs := []interface{}{4, 5, 6, 7, 8, 9, 10, 11, 1, 14}
+	assert.Equal(t, expectedArgs, args)
+}

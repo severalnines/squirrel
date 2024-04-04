@@ -25,6 +25,3 @@ script:
   - go test -args -driver sqlite3
   - go test -args -driver mysql -dataSource travis@/squirrel
   - go test -args -driver postgres -dataSource 'postgres://postgres@localhost/squirrel?sslmode=disable'
-
-notifications:
-  irc: "irc.freenode.net#masterminds"

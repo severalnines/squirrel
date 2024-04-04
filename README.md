@@ -6,12 +6,12 @@ Bug fixes will still be merged (slowly). Bug reports are welcome, but I will not
 # Squirrel - fluent SQL generator for Go
 
 ```go
-import "github.com/Masterminds/squirrel"
+import "github.com/severalnines/squirrel"
 ```
 
 
-[![GoDoc](https://godoc.org/github.com/Masterminds/squirrel?status.png)](https://godoc.org/github.com/Masterminds/squirrel)
-[![Build Status](https://api.travis-ci.org/Masterminds/squirrel.svg?branch=master)](https://travis-ci.org/Masterminds/squirrel)
+[![GoDoc](https://godoc.org/github.com/severalnines/squirrel?status.png)](https://godoc.org/github.com/severalnines/squirrel)
+[![Build Status](https://api.travis-ci.org/severalnines/squirrel.svg?branch=master)](https://travis-ci.org/severalnines/squirrel)
 
 **Squirrel is not an ORM.** For an application of Squirrel, check out
 [structable, a table-struct mapper](https://github.com/Masterminds/structable)
@@ -20,7 +20,7 @@ import "github.com/Masterminds/squirrel"
 Squirrel helps you build SQL queries from composable parts:
 
 ```go
-import sq "github.com/Masterminds/squirrel"
+import sq "github.com/severalnines/squirrel"
 
 users := sq.Select("*").From("users").Join("emails USING (email_id)")
 
@@ -29,6 +29,11 @@ active := users.Where(sq.Eq{"deleted_at": nil})
 sql, args, err := active.ToSql()
 
 sql == "SELECT * FROM users JOIN emails USING (email_id) WHERE deleted_at IS NULL"
+
+// or you can get only the tail part:
+tail, args, err := active.Tail()
+tail == " WHERE deleted_at IS NULL"
+
 ```
 
 ```go
@@ -108,7 +113,7 @@ SELECT * FROM nodes WHERE meta->'format' ?| array[$1,$2]
 
 ## FAQ
 
-* **How can I build an IN query on composite keys / tuples, e.g. `WHERE (col1, col2) IN ((1,2),(3,4))`? ([#104](https://github.com/Masterminds/squirrel/issues/104))**
+* **How can I build an IN query on composite keys / tuples, e.g. `WHERE (col1, col2) IN ((1,2),(3,4))`? ([#104](https://github.com/severalnines/squirrel/issues/104))**
 
     Squirrel does not explicitly support tuples, but you can get the same effect with e.g.:
 
@@ -124,7 +129,7 @@ SELECT * FROM nodes WHERE meta->'format' ?| array[$1,$2]
 
     (which should produce the same query plan as the tuple version)
 
-* **Why doesn't `Eq{"mynumber": []uint8{1,2,3}}` turn into an `IN` query? ([#114](https://github.com/Masterminds/squirrel/issues/114))**
+* **Why doesn't `Eq{"mynumber": []uint8{1,2,3}}` turn into an `IN` query? ([#114](https://github.com/severalnines/squirrel/issues/114))**
 
     Values of type `[]byte` are handled specially by `database/sql`. In Go, [`byte` is just an alias of `uint8`](https://golang.org/pkg/builtin/#byte), so there is no way to distinguish `[]uint8` from `[]byte`.
 
